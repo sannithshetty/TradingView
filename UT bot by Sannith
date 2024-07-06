@@ -1,0 +1,48 @@
+//@version=5
+indicator(title='UT Bot by Sannith', overlay=true)
+
+// Inputs
+keyvalue_sell = input.float(2, title='Sell Key Value', step=.5)
+keyvalue_buy = input.float(2, title='Buy Key Value', step=.5)
+atrperiod_sell = input(1, title='ATR Period (Sell)')
+atrperiod_buy = input(300, title='ATR Period (Buy)')
+
+// Source price
+src = close
+
+// ATR calculations
+xATR_sell = ta.atr(atrperiod_sell)
+nLoss_sell = keyvalue_sell * xATR_sell
+
+xATR_buy = ta.atr(atrperiod_buy)
+nLoss_buy = keyvalue_buy * xATR_buy
+
+// Initialize variables
+var float xATRTrailingStop = na
+var float pos = na
+
+// Trailing Stop logic
+iff_1 = src > nz(xATRTrailingStop[1], na) ? src - (pos == -1 ? nLoss_sell : nLoss_buy) : src + (pos == -1 ? nLoss_sell : nLoss_buy)
+iff_2 = src < nz(xATRTrailingStop[1], na) and src[1] < nz(xATRTrailingStop[1], na) ? math.min(nz(xATRTrailingStop[1]), src + (pos == -1 ? nLoss_sell : nLoss_buy)) : iff_1
+xATRTrailingStop := src > nz(xATRTrailingStop[1], na) and src[1] > nz(xATRTrailingStop[1], na) ? math.max(nz(xATRTrailingStop[1]), src - (pos == -1 ? nLoss_sell : nLoss_buy)) : iff_2
+
+// Position logic
+iff_3 = src[1] > nz(xATRTrailingStop[1], na) and src < nz(xATRTrailingStop[1], na) ? -1 : nz(pos[1], 0)
+pos := src[1] < nz(xATRTrailingStop[1], na) and src > nz(xATRTrailingStop[1], na) ? 1 : iff_3
+
+// Plotting
+xcolor = pos == -1 ? color.red : pos == 1 ? color.green : color.blue
+plot(xATRTrailingStop, color=xcolor, title='Trailing Stop')
+
+buy = ta.crossover(src, xATRTrailingStop)
+sell = ta.crossunder(src, xATRTrailingStop)
+barcolor = src > xATRTrailingStop
+
+plotshape(buy, title='Buy', text='Buy', style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+plotshape(sell, title='Sell', text='Sell', style=shape.labeldown, color=color.new(color.red, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+
+barcolor(barcolor ? color.green : color.red)
+
+alertcondition(buy, title='UT BOT Buy', message='UT BOT Buy')
+alertcondition(sell, title='UT BOT Sell', message='UT BOT Sell')
+
